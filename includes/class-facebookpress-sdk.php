@@ -57,17 +57,23 @@ class Facebookpress_SDK {
 	 * @since    1.0.0
 	 */
 	public function __construct() {
+
 		$this->app_id = Facebookpress::get_option('app_id');
+
 		$this->app_secret = Facebookpress::get_option('app_secret');
 
 		if ( ! empty( $this->app_id ) && ! empty( $this->app_secret ) ){
+
 			$fb = new Facebook\Facebook([
 			  'app_id' => $this->app_id,
 			  'app_secret' => $this->app_secret,
 			  'default_graph_version' => 'v2.5',
 			]);
+
 			$this->fb = $fb;
+
 		}else{
+
 			$this->fb =false;
 		}
 	}
@@ -80,17 +86,25 @@ class Facebookpress_SDK {
 	public function login_button() {
 
 		$token = Facebookpress::get_option('auth_token');
+
 		$nonce = wp_create_nonce( 'fp-nonce' );
+
 		$revoke_url =  admin_url( 'admin.php?page=facebookpress-setting&revoke&_wpnonce='.$nonce);
 
 		if (  false !== $this->fb && empty( $token )) {
 
 			$callback_url = Facebookpress::get_option('callback_url');
+
 			$helper = $this->fb->getRedirectLoginHelper();
+
 			$permissions = ['email', 'user_likes']; // optional
+
 			$callback_url =  admin_url( 'admin.php?page=facebookpress-setting&_wpnonce='.$nonce);
+
 			$loginUrl = $helper->getLoginUrl($callback_url, $permissions);
+
 			$html_url =  '<br><br><br><a href="' . $loginUrl . '" class="button button-primary">Log in with Facebook!</a>';
+
 		}elseif ( !empty( $token ) ) {
 
 			$html_url =  '<br><br><br><a href="" class="button button-primary fb-button disabled" disabled="disabled">Already with Facebook!</a> <a href="' . $revoke_url . '" class="button button-primary">Revoke</a>';
@@ -102,21 +116,67 @@ class Facebookpress_SDK {
 		}
 		echo $html_url;
 
-	}	
+	}
 
 	/**
-	 * Check whether token exist or not
+	 * Run the importer 
 	 *
 	 * @since    1.0.0
-	 * @return boolean
 	 */
-	public function check_token() {
-		$token = Facebookpress::get_option('fb_token');
-		if ( isset( $token ) && ! empty( $token )  )
-			return true;
-		return false;
+	public function get_feed() {
 
+		$token = Facebookpress::get_option('auth_token');
+
+		$page_id = Facebookpress::get_option('page_id');
+
+		$this->fb->setDefaultAccessToken($token);
+
+		try {
+
+		  $response = $this->fb->get('/'.$page_id.'/feed?fields=attachments,message&limit=100');
+		
+		} catch(Facebook\Exceptions\FacebookResponseException $e) {
+		  // When Graph returns an error
+		  echo 'Graph returned an error: ' . $e->getMessage();
+		  exit;
+		} catch(Facebook\Exceptions\FacebookSDKException $e) {
+		  // When validation fails or other local issues
+		  echo 'Facebook SDK returned an error: ' . $e->getMessage();
+		  exit;
+		}		
+
+		return $response->getDecodedBody();
 	}
+
+	/**
+	 * Run the importer 
+	 *
+	 * @since    1.0.0
+	 */
+	public function verify_token() {
+
+		$helper = $this->fb->getRedirectLoginHelper();
+
+		try {
+		  $accessToken = $helper->getAccessToken();
+
+		} catch(Facebook\Exceptions\FacebookResponseException $e) {
+		  // When Graph returns an error
+		  echo 'Graph returned an error: ' . $e->getMessage();
+		  exit;
+		} catch(Facebook\Exceptions\FacebookSDKException $e) {
+		  // When validation fails or other local issues
+		  echo 'Facebook SDK returned an error: ' . $e->getMessage();
+		  exit;
+		}
+		if (isset($accessToken)) {
+
+		  $_SESSION['facebook_access_token'] = (string) $accessToken;
+		  
+		  return $_SESSION['facebook_access_token'];
+		}
+	}
+
 
 	/**
 	 * Check whether the info is completed or not

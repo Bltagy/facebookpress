@@ -39,15 +39,17 @@
 		};
 		// We can also pass the url value separately from ajaxurl for front end AJAX implementations
 		jQuery.post(ajax_object.ajax_url, data, function(response) {
+			var that_name = that.attr('name');
+			var this_name = that_name.replace("choose_post_type", "choose_category")
 			if( ! response.success ){
-				$('#choose_category').html('<option value="0">No Data</option>');
+				$('select#choose_category[name="'+this_name+'"]').html('<option value="0">No Data</option>');
 				return false;
 			}
-			$('#choose_category').text('');
+			$('select#choose_category[name="'+this_name+'"]').text('');
 			$.each(response.data, function(index, val) {
-				 $('#choose_category').append('<option value="'+val.slug+'">'+val.name+'</option>');
+				 $('select#choose_category[name="'+this_name+'"]').append('<option value="'+val.slug+'">'+val.name+'</option>');
 			});
-			$('#choose_category').removeAttr('disabled');
+			$('select#choose_category[name="'+this_name+'"]').removeAttr('disabled');
 			// alert('Got this from the server: ' + response);
 		});	
 		/* Act on the event */
@@ -65,3 +67,31 @@
 });
 
 })( jQuery );
+
+
+jQuery ( function($) {
+    var progressbar = $( "#progressbar" ),
+      progressLabel = $( ".progress-label" );
+ 
+    progressbar.progressbar({
+      value: false,
+      change: function() {
+        progressLabel.text( progressbar.progressbar( "value" ) + "%" );
+      },
+      complete: function() {
+        progressLabel.text( "Complete!" );
+      }
+    });
+ 
+    function progress() {
+      var val = progressbar.progressbar( "value" ) || 0;
+ 
+      progressbar.progressbar( "value", val + 2 );
+ 
+      if ( val < 99 ) {
+        setTimeout( progress, 80 );
+      }
+    }
+ 
+    setTimeout( progress, 2000 );
+  } );

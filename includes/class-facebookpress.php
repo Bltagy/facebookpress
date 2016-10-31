@@ -66,7 +66,8 @@ class Facebookpress {
 	 *
 	 * @since    1.0.0
 	 */
-	public function __construct() {
+	public function __construct() {	
+		session_start();
 		
 		$this->plugin_name = 'facebookpress';
 		$this->version = '1.0.0';
@@ -164,15 +165,17 @@ class Facebookpress {
 
 		$plugin_setting = new FacebookpressSetting( $plugin_admin );
 
-		$this->loader->add_action( 'init', $plugin_admin, 'request_handler' );
-
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
 
 		$this->loader->add_action( 'wp_ajax_cat_select', $plugin_admin, 'cat_select_callback' );
 
 		$this->loader->add_action( 'admin_menu', $plugin_setting, 'facebookpress_setting_add_plugin_page' );
+		
+		$this->loader->add_action( 'admin_menu', $plugin_setting, 'facebookpress_setting_add_plugin_page_2' );
 
 		$this->loader->add_action( 'admin_init', $plugin_setting, 'facebookpress_setting_page_init' );
+
+		$this->loader->add_action( 'init', $plugin_admin, 'request_handler' );
 
 	}
 

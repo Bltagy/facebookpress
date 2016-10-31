@@ -72,8 +72,12 @@ class Facebookpress_Admin {
 	 *
 	 * @since    1.0.0
 	 */
-	public function enqueue_scripts() {
+	public function enqueue_scripts( $hook ) {
 
+		// Target a Specific Admin Page
+		if ( 'facebookpress_page_facebookpress-setting-run' != $hook 
+			&& 'toplevel_page_facebookpress-setting' != $hook )
+			 return;
 		/**
 		 * This function is provided for demonstration purposes only.
 		 *
@@ -87,6 +91,7 @@ class Facebookpress_Admin {
 		 */
 
 		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/facebookpress-admin.js', array( 'jquery' ), $this->version, false );
+		wp_enqueue_script( 'jquery-ui-progressbar');
 		wp_localize_script( $this->plugin_name, 'ajax_object', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ) );	
 
 	}	
@@ -156,12 +161,38 @@ class Facebookpress_Admin {
 	public function request_handler() {
 
 		if ( isset( $_REQUEST['code'] ) && !empty( $_REQUEST['code'] ) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'fp-nonce' ) ){
-			Facebookpress::update_option('auth_token', $_GET['code']);
+			$token = $this->sdk->verify_token();
+			Facebookpress::update_option('auth_token', $token);
 		}
 
 		if ( isset( $_REQUEST['revoke'] ) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'fp-nonce' ) ){
 			Facebookpress::update_option('auth_token', '');
 		}
+
+		if ( isset( $_REQUEST['fp_action'] ) && $_REQUEST['fp_action'] == 'run_impoter' && wp_verify_nonce( $_REQUEST['_wpnonce'], 'fp-nonce' ) ){
+			$this->run_impoter();
+		}
 		
 	}
+
+	/**
+	 * Run the importer
+	 *
+	 * @since    1.0.0
+	 */
+	public function run_impoter() {
+		$post_type = Facebookpress::get_option('choose_post_type');
+		debug($post_type);die;
+		$fb_feed = $this->sdk->get_feed();
+		$data = $fb_feed['data'];
+		foreach ($data as $post) {
+			if ( $post['attachments']['data'][0]['type'] == 'share' )
+
+				debug($post['attachments']);
+			debug('<br><br><br><br>');
+		}
+		die;
+		debug($fb_feed['data']);die;
+		
+;	}
 }
