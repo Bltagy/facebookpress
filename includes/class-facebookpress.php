@@ -167,8 +167,6 @@ class Facebookpress {
 
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
 
-		$this->loader->add_action( 'wp_ajax_cat_select', $plugin_admin, 'cat_select_callback' );
-
 		$this->loader->add_action( 'admin_menu', $plugin_setting, 'facebookpress_setting_add_plugin_page' );
 		
 		$this->loader->add_action( 'admin_menu', $plugin_setting, 'facebookpress_setting_add_plugin_page_2' );
@@ -176,6 +174,10 @@ class Facebookpress {
 		$this->loader->add_action( 'admin_init', $plugin_setting, 'facebookpress_setting_page_init' );
 
 		$this->loader->add_action( 'init', $plugin_admin, 'request_handler' );
+
+		$this->loader->add_action( 'wp_ajax_cat_select', $plugin_admin, 'cat_select_callback' );
+
+		$this->loader->add_action( 'wp_ajax_run_importer', $plugin_admin, 'run_importer_callback' );
 
 	}
 

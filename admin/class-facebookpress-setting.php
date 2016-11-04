@@ -38,7 +38,8 @@ class FacebookpressSetting {
 
 
 	public function facebookpress_setting_create_admin_page_2() {
-		$this->facebookpress_setting_options = get_option( 'facebookpress_setting_option' );
+		$this->facebookpress_setting_options = get_option( 'facebookpress_setting_option' ); 
+		$token = $this->facebookpress_setting_options['auth_token'];
 		$nonce = wp_create_nonce( 'fp-nonce' );
 		$callback_url =  admin_url( 'admin.php?page=facebookpress-setting-run&fp_action=run_impoter&_wpnonce='.$nonce);
 		?>
@@ -58,7 +59,12 @@ class FacebookpressSetting {
 			<h2>Facebookpress Importer</h2>
 			<div id="progressbar"><div class="progress-label">Loading...</div></div>
 
-			<p><a href="<?php echo $callback_url;?>" class="button button-primary">Start Importer</a></p>
+			<?php 
+			if ( empty($token) ) : ?>
+				<p><a href="" class="button button-primary fb-button disabled" disabled>Start Importer</a></p>
+			<?php else:?>
+				<p><a href="<?php echo $callback_url;?>" class="button button-primary">Start Importer</a></p>
+			<?php endif;?>
 		</div>
 	<?php }
 
@@ -169,11 +175,17 @@ class FacebookpressSetting {
 			$sanitary_values['import_images'] = $input['import_images'];
 		}
 
+
+		if ( isset( $input['auth_token'] ) ) {
+			$sanitary_values['auth_token'] = $input['auth_token'];
+		}
+
 		return $sanitary_values;
 	}
 
 	public function facebookpress_setting_section_info() {
 		
+				
 	}
 
 	public function app_id_callback() {
@@ -198,8 +210,8 @@ class FacebookpressSetting {
 	}
 
 	public function choose_post_type_callback() {
-		$selected_post_type = Facebookpress::get_option('choose_post_type');
-		$term_slug = Facebookpress::get_option('choose_category');
+		$selected_post_type = $this->facebookpress_setting_options['choose_post_type'];
+		$term_slug = $this->facebookpress_setting_options[ 'choose_category' ] ;
 		?> 
 		<table>
 			<caption>Choose category for every facebook feed type</caption>
@@ -212,41 +224,10 @@ class FacebookpressSetting {
 			</thead>
 			<tbody>
 				<tr>
-					<td>All/The Rest</td>
-					<td>
-						<select name="facebookpress_setting_option[choose_post_type][all]" id="choose_post_type">
-							<option value="0" disabled="" selected>Choose post type</option>
-							<?php foreach ($this->admin->get_post_types() as $slug => $post_type) {?>
-
-							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['all'] ) && $this->facebookpress_setting_options['choose_post_type']['all'] === $slug ) ? 'selected' : '' ; ?>
-							<option value="<?php echo $slug;?>" <?php echo $selected; ?>><?php echo $post_type;?> </option>
-							<?php } ?>
-						</select>
-					</td>
-					<td>
-						<select name="facebookpress_setting_option[choose_category][all]" id="choose_category">
-							<?php
-							if ( isset( $term_slug['all'] ) && !empty( $term_slug['all'] ) ) {
-							$terms = $this->admin->get_post_cats( $selected_post_type['all'] );
-								foreach ( $terms as $term ) {
-								
-									?>
-									<?php $selected = (isset( $term_slug['all'] ) && $term_slug['all'] == $term['slug'] ) ? 'selected' : '' ; ?>
-									<option value="<?php echo $term['slug'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
-								<?php } 
-							} ?>
-
-							<option value="0">Select post type first</option>	
-						</select>
-					</td>
-				</tr>
-				<tr>
 					<td>FB Post</td>
 					<td>
 						<select name="facebookpress_setting_option[choose_post_type][post]" id="choose_post_type">
 							<option value="0" disabled="" selected>Choose post type</option>
-							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['post'] ) && $this->facebookpress_setting_options['choose_post_type']['post'] === 'no-import' ) ? 'selected' : '' ; ?>
-							<option value="no-import" <?php echo $selected;?>>Don't import</option>
 							<?php foreach ($this->admin->get_post_types() as $slug => $post_type) {?>
 
 							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['post'] ) && $this->facebookpress_setting_options['choose_post_type']['post'] === $slug ) ? 'selected' : '' ; ?>
@@ -262,8 +243,8 @@ class FacebookpressSetting {
 								foreach ( $terms as $term ) {
 								
 									?>
-									<?php $selected = (isset( $term_slug['post'] ) && $term_slug['post'] == $term['slug'] ) ? 'selected' : '' ; ?>
-									<option value="<?php echo $term['slug'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
+									<?php $selected = (isset( $term_slug['post'] ) && $term_slug['post'] == $term['term_id'] ) ? 'selected' : '' ; ?>
+									<option value="<?php echo $term['term_id'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
 								<?php } 
 							} ?>
 
@@ -276,7 +257,8 @@ class FacebookpressSetting {
 					<td>
 						<select name="facebookpress_setting_option[choose_post_type][album]" id="choose_post_type">
 							<option value="0" disabled="" selected>Choose post type</option>
-							<option value="0" disabled="" selected>Choose post type</option>
+							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['post'] ) && $this->facebookpress_setting_options['choose_post_type']['post'] === 'no-import' ) ? 'selected' : '' ; ?>
+							<option value="no-import" <?php echo $selected;?>>Don't import</option>
 							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['album'] ) && $this->facebookpress_setting_options['choose_post_type']['post'] === 'no-import' ) ? 'selected' : '' ; ?>
 							<?php foreach ($this->admin->get_post_types() as $slug => $post_type) {?>
 
@@ -293,8 +275,8 @@ class FacebookpressSetting {
 								foreach ( $terms as $term ) {
 								
 									?>
-									<?php $selected = (isset( $term_slug['album'] ) && $term_slug['album'] == $term['slug'] ) ? 'selected' : '' ; ?>
-									<option value="<?php echo $term['slug'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
+									<?php $selected = (isset( $term_slug['album'] ) && $term_slug['album'] == $term['term_id'] ) ? 'selected' : '' ; ?>
+									<option value="<?php echo $term['term_id'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
 								<?php } 
 							} ?>
 
@@ -307,7 +289,8 @@ class FacebookpressSetting {
 					<td>
 						<select name="facebookpress_setting_option[choose_post_type][event]" id="choose_post_type">
 							<option value="0" disabled="" selected>Choose post type</option>
-							<option value="0" disabled="" selected>Choose post type</option>
+							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['post'] ) && $this->facebookpress_setting_options['choose_post_type']['post'] === 'no-import' ) ? 'selected' : '' ; ?>
+							<option value="no-import" <?php echo $selected;?>>Don't import</option>
 							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['album'] ) && $this->facebookpress_setting_options['choose_post_type']['event'] === 'no-import' ) ? 'selected' : '' ; ?>
 							<?php foreach ($this->admin->get_post_types() as $slug => $post_type) {?>
 
@@ -324,8 +307,8 @@ class FacebookpressSetting {
 								foreach ( $terms as $term ) {
 								
 									?>
-									<?php $selected = (isset( $term_slug['event'] ) && $term_slug['event'] == $term['slug'] ) ? 'selected' : '' ; ?>
-									<option value="<?php echo $term['slug'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
+									<?php $selected = (isset( $term_slug['event'] ) && $term_slug['event'] == $term['term_id'] ) ? 'selected' : '' ; ?>
+									<option value="<?php echo $term['term_id'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
 								<?php } 
 							} ?>
 
@@ -338,7 +321,8 @@ class FacebookpressSetting {
 					<td>
 						<select name="facebookpress_setting_option[choose_post_type][video]" id="choose_post_type">
 							<option value="0" disabled="" selected>Choose post type</option>
-							<option value="0" disabled="" selected>Choose post type</option>
+							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['post'] ) && $this->facebookpress_setting_options['choose_post_type']['post'] === 'no-import' ) ? 'selected' : '' ; ?>
+							<option value="no-import" <?php echo $selected;?>>Don't import</option>
 							<?php $selected = (isset( $this->facebookpress_setting_options['choose_post_type']['album'] ) && $this->facebookpress_setting_options['choose_post_type']['video'] === 'no-import' ) ? 'selected' : '' ; ?>
 							<?php foreach ($this->admin->get_post_types() as $slug => $post_type) {?>
 
@@ -355,8 +339,8 @@ class FacebookpressSetting {
 								foreach ( $terms as $term ) {
 								
 									?>
-									<?php $selected = (isset( $term_slug['video'] ) && $term_slug['video'] == $term['slug'] ) ? 'selected' : '' ; ?>
-									<option value="<?php echo $term['slug'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
+									<?php $selected = (isset( $term_slug['video'] ) && $term_slug['video'] == $term['term_id'] ) ? 'selected' : '' ; ?>
+									<option value="<?php echo $term['term_id'];?>" <?php echo $selected; ?>><?php echo $term['name'];?> </option>
 								<?php } 
 							} ?>
 
@@ -379,6 +363,11 @@ class FacebookpressSetting {
 
 	public function choose_category_callback() {
 		$this->admin->sdk->login_button();
+
+		printf(
+			'<input class="regular-text" type="hidden" name="facebookpress_setting_option[auth_token]" id="auth_token" value="%s">',
+			isset( $this->facebookpress_setting_options['auth_token'] ) ? esc_attr( $this->facebookpress_setting_options['auth_token']) : ''
+		);
 
 	}
 

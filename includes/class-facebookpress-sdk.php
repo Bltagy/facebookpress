@@ -47,9 +47,17 @@ class Facebookpress_SDK {
 	 * The Facebook object calss.
 	 *
 	 * @since    1.0.0
-	 * @access   protected
+	 * @access   public
 	 */
 	public $fb;
+
+	/**
+	 * The Facebook object error.
+	 *
+	 * @since    1.0.0
+	 * @access   protected
+	 */
+	public $error_message;
 
 	/**
 	 * Initialize FB class.
@@ -133,7 +141,35 @@ class Facebookpress_SDK {
 
 		try {
 
-		  $response = $this->fb->get('/'.$page_id.'/feed?fields=attachments,message&limit=100');
+		  $response = $this->fb->get('/'.$page_id.'/feed?fields=attachments,name,type,caption,message&limit=20');
+		
+		} catch(Facebook\Exceptions\FacebookResponseException $e) {
+		  // When Graph returns an error
+		  echo 'Graph returned an error: ' . $e->getMessage();
+		  exit;
+		} catch(Facebook\Exceptions\FacebookSDKException $e) {
+		  // When validation fails or other local issues
+		  echo 'Facebook SDK returned an error: ' . $e->getMessage();
+		  exit;
+		}		
+
+		return $response->getDecodedBody();
+	}
+
+/**
+	 * Run the importer 
+	 *
+	 * @since    1.0.0
+	 */
+	public function get_video( $video_id ) {
+
+		$token = Facebookpress::get_option('auth_token');
+
+		$this->fb->setDefaultAccessToken($token);
+
+		try {
+
+		  $response = $this->fb->get('/'.$video_id.'/?fields=embed_html');
 		
 		} catch(Facebook\Exceptions\FacebookResponseException $e) {
 		  // When Graph returns an error
@@ -155,6 +191,8 @@ class Facebookpress_SDK {
 	 */
 	public function verify_token() {
 
+		if ( !empty( Facebookpress::get_option('auth_token') ) )
+		return false;
 		$helper = $this->fb->getRedirectLoginHelper();
 
 		try {
@@ -162,12 +200,12 @@ class Facebookpress_SDK {
 
 		} catch(Facebook\Exceptions\FacebookResponseException $e) {
 		  // When Graph returns an error
-		  echo 'Graph returned an error: ' . $e->getMessage();
-		  exit;
+		  $this->error_message = 'Graph returned an error: ' . $e->getMessage();
+		  return false;
 		} catch(Facebook\Exceptions\FacebookSDKException $e) {
 		  // When validation fails or other local issues
-		  echo 'Facebook SDK returned an error: ' . $e->getMessage();
-		  exit;
+		  $this->error_message = 'Facebook SDK returned an error: ' . $e->getMessage();
+		  return false;
 		}
 		if (isset($accessToken)) {
 

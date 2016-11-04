@@ -92,7 +92,11 @@ class Facebookpress_Admin {
 
 		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/facebookpress-admin.js', array( 'jquery' ), $this->version, false );
 		wp_enqueue_script( 'jquery-ui-progressbar');
-		wp_localize_script( $this->plugin_name, 'ajax_object', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ) );	
+		wp_localize_script( $this->plugin_name, 'ajax_object', 
+			array(
+				'ajax_url' => admin_url( 'admin-ajax.php' ),
+				'secure_ajax' => wp_create_nonce( "fp-ajax-nonce" ),
+			) );	
 
 	}	
 
@@ -150,7 +154,27 @@ class Facebookpress_Admin {
 			wp_send_json_success( $terms );
 
 		wp_send_json_error();
+	}
+
+	/**
+	 * Handle AJAX requests.
+	 *
+	 * @since    1.0.0
+	 */
+	public function run_importer_callback() {
 		
+		check_ajax_referer( 'fp-ajax-nonce', 'security' );
+
+		$data = $_POST;
+
+		$offset = ( ! isset( $data['offset'] ) || empty( $data['offset'] ) ) ? 0 : $data['offset'];
+
+		$return_offset = $this->run_impoter( $offset );
+
+		if ( $return_offset )
+			wp_send_json_success( $return_offset );
+
+		wp_send_json_error();
 	}
 
 	/**
@@ -160,9 +184,10 @@ class Facebookpress_Admin {
 	 */
 	public function request_handler() {
 
-		if ( isset( $_REQUEST['code'] ) && !empty( $_REQUEST['code'] ) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'fp-nonce' ) ){
+		if ( isset( $_REQUEST['code'] ) && !empty( $_REQUEST['code'] ) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'fp-nonce' ) && !isset($_POST['submit']) ){
 			$token = $this->sdk->verify_token();
 			Facebookpress::update_option('auth_token', $token);
+			wp_redirect(admin_url( 'admin.php?page=facebookpress-setting'));
 		}
 
 		if ( isset( $_REQUEST['revoke'] ) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'fp-nonce' ) ){
@@ -180,19 +205,187 @@ class Facebookpress_Admin {
 	 *
 	 * @since    1.0.0
 	 */
-	public function run_impoter() {
-		$post_type = Facebookpress::get_option('choose_post_type');
-		debug($post_type);die;
-		$fb_feed = $this->sdk->get_feed();
-		$data = $fb_feed['data'];
-		foreach ($data as $post) {
-			if ( $post['attachments']['data'][0]['type'] == 'share' )
+	public function run_impoter( $offset = 0 ) {
+		$wanted_count = 100;
 
-				debug($post['attachments']);
-			debug('<br><br><br><br>');
+		$step = ceil( $wanted_count / 10 );
+
+		$cache_data = get_transient( 'fp_ajax_data' );
+
+		$fb_feed = ( ! $cache_data ) ? $fb_feed = $this->sdk->get_feed() : $cache_data;
+
+
+
+		$count = 0;
+
+		foreach ($fb_feed['data'] as $key => $post) {
+
+			$count++; 
+
+			// $type = ( ! isset( $post['attachments']['data'][0]['type'] ) ) ? $post['type'] : $post['attachments']['data'][0]['type'] ;
+
+			// if ($type == 'status'){
+			// 	$type = 'post';
+			// }
+			// switch ( $type ) {
+			// 	case 'photo':
+			// 		$this->wp_insert_post( $post, 'post' );
+			// 		break;
+				
+			// 	case 'album':
+			// 		$this->wp_insert_post( $post, 'album' );
+			// 		break;
+				
+			// 	case 'event':
+			// 		$this->wp_insert_post( $post, 'event' );
+			// 		break;
+				
+			// 	case 'video_inline':
+			// 		$this->wp_insert_post( $post, 'video' );
+			// 		break;
+			// }
+			unset( $fb_feed['data'][$key] );
+
+			if ( $count == $step ){
+				if ( empty($fb_feed['data']) ){
+
+					delete_transient('fp_ajax_data');
+
+					return true;
+
+				}else{
+
+					set_transient( 'fp_ajax_data', $fb_feed, 1 * HOUR_IN_SECONDS );
+					
+				}
+				break;
+			}
 		}
-		die;
-		debug($fb_feed['data']);die;
+		return true;
+	}
+
+	/**
+	 * Insert the fb feed data into the WP
+	 * @param  array $feed_data 
+	 * @param  string $feed_type
+	 * @since 	1.0.0 
+	 */
+	public function wp_insert_post( $feed_data, $feed_type ){
+		// if ( $feed_type != 'album' ) return false;
+
+		$post_type = Facebookpress::get_option('choose_post_type');
+		$post_cat = Facebookpress::get_option('choose_category');
+		$import_images = Facebookpress::get_option('import_images');
+		$wp_post_type = $post_type[ $feed_type ];
+
+		$category = $post_cat[ $feed_type ];
 		
-;	}
+
+		if( $feed_data['name'] == 'Timeline Photos' 
+			|| strpos( $feed_data['name'] , 'cover photo') !== false 
+			|| strpos( $feed_data['name'] , 'Photos from') !== false 
+			 ){
+			$post_title = wp_trim_words( $feed_data['message'], 6 );
+		}else{
+			$post_title = $feed_data['name'];
+		}
+		$post_data = array(
+		  'post_title'    => wp_strip_all_tags( $post_title ),
+		  'post_content'  => $feed_data['message'],
+		  'post_type' 	  => $wp_post_type,
+		  'post_status'   => 'pending',
+		  'post_category' => array( $category )
+		);
+		$id = wp_insert_post( $post_data );
+
+
+
+		if ( !empty( $import_images ) ){
+			if ( $feed_type == 'album' ){
+				foreach ($feed_data['attachments']['data'][0]['subattachments']['data'] as $key => $media) {
+						$img_url = trim($media['media']['image']['src']);
+
+						$this->generate_featured_image( $img_url, $id, $key );
+				}
+			}else{
+				$img_url = $feed_data['attachments']['data'][0]['media']['image']['src'];
+				$this->generate_featured_image( $img_url, $id );
+			}
+		}
+
+		if ( $feed_type == 'video' )
+			$this->insert_video( $feed_data, $id );
+	}
+
+	/**
+	 * upload and assign image to a post
+	 * @param  string $image_url 
+	 * @param  int $post_id
+	 * @since 1.0.0
+	 */
+	public function generate_featured_image($image_url, $post_id, $key=0) {
+	    $upload_dir = wp_upload_dir();
+	    $image_data = file_get_contents($image_url);
+	    $filename = basename($image_url);
+	    $name = explode('?oh=', $filename);
+	    $filename = $name[0];
+	    // debug($filename);die;
+	    if (wp_mkdir_p($upload_dir['path'])) {
+	        $file = $upload_dir['path'] . '/' . $filename;
+	    } else {
+	        $file = $upload_dir['basedir'] . '/' . $filename;
+	    }
+
+	    file_put_contents($file, $image_data);
+
+	    $wp_filetype = wp_check_filetype($filename, null);
+	    $attachment = array(
+	        'post_mime_type' => $wp_filetype['type'],
+	        'post_title' => sanitize_file_name($filename),
+	        'post_content' => '',
+	        'post_status' => 'inherit',
+	    );
+
+	    $attach_id = wp_insert_attachment($attachment, $file, $post_id);
+
+	    require_once ABSPATH . 'wp-admin/includes/image.php';
+
+	    $attach_data = wp_generate_attachment_metadata($attach_id, $file);
+
+	    $res1 = wp_update_attachment_metadata($attach_id, $attach_data);
+	    if ( $key == 0 ){
+	    	$res2 = set_post_thumbnail($post_id, $attach_id);
+	    }else{
+	    	$img_tag = wp_get_attachment_image( $attach_id, 'full', "", array( "class" => "img-responsive" ) );
+	    	$content_post = get_post($post_id);
+	    	$new_content = $content_post->post_content.$img_tag;
+		    $args = array(
+			      'ID'           => $post_id,
+			      'post_content' => $new_content,
+			  );
+			// Update the post into the database
+			wp_update_post( $args );	    	
+	    }
+	}
+
+	public function insert_video( $video_data, $post_id ){
+
+		$video_id = $video_data['attachments']['data'][0]['target']['id'];
+
+		$video_width = $video_data['attachments']['data'][0]['media']['image']['width'];
+
+		$video_height = $video_data['attachments']['data'][0]['media']['image']['height'];
+
+		$content_post = get_post($post_id);
+
+		$embed_html = '<iframe src="https://www.facebook.com/video/embed?video_id='.$video_id.'" width="'.$video_width.'" height="'.$video_height.'"  frameborder="0"></iframe>';
+
+	    $new_content = $content_post->post_content.$embed_html;
+		$args = array(
+		     'ID'           => $post_id,
+		      'post_content' => $new_content,
+		 );
+		wp_update_post( $args );	    	
+	}
+
 }
