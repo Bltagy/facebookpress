@@ -90,12 +90,23 @@ class Facebookpress_Admin {
 		 * class.
 		 */
 
+		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/facebookpress-admin.css');
+
 		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/facebookpress-admin.js', array( 'jquery' ), $this->version, false );
+
 		wp_enqueue_script( 'jquery-ui-progressbar');
+
+
+		// Calculate progress bar step
+		$wanted_count = ( Facebookpress::get_option('wanted_count') ) ? $post_type = Facebookpress::get_option('wanted_count') : 100;
+
+		$step = ceil( 100 / ($wanted_count / 10) );
+
 		wp_localize_script( $this->plugin_name, 'ajax_object', 
 			array(
 				'ajax_url' => admin_url( 'admin-ajax.php' ),
 				'secure_ajax' => wp_create_nonce( "fp-ajax-nonce" ),
+				'step' => $step
 			) );	
 
 	}	
@@ -162,13 +173,10 @@ class Facebookpress_Admin {
 	 * @since    1.0.0
 	 */
 	public function run_importer_callback() {
-		
+
 		check_ajax_referer( 'fp-ajax-nonce', 'security' );
-
 		$data = $_POST;
-
 		$offset = ( ! isset( $data['offset'] ) || empty( $data['offset'] ) ) ? 0 : $data['offset'];
-
 		$return_offset = $this->run_impoter( $offset );
 
 		if ( $return_offset )
@@ -194,8 +202,8 @@ class Facebookpress_Admin {
 			Facebookpress::update_option('auth_token', '');
 		}
 
-		if ( isset( $_REQUEST['fp_action'] ) && $_REQUEST['fp_action'] == 'run_impoter' && wp_verify_nonce( $_REQUEST['_wpnonce'], 'fp-nonce' ) ){
-			$this->run_impoter();
+		if ( isset( $_REQUEST['fp_action'] ) && $_REQUEST['fp_action'] == 'run_impoter' ){
+			// $this->run_impoter();
 		}
 		
 	}
@@ -206,56 +214,52 @@ class Facebookpress_Admin {
 	 * @since    1.0.0
 	 */
 	public function run_impoter( $offset = 0 ) {
-		$wanted_count = 100;
-
-		$step = ceil( $wanted_count / 10 );
-
+		$wanted_count = ( Facebookpress::get_option('wanted_count') ) ? $post_type = Facebookpress::get_option('wanted_count') : 100;
 		$cache_data = get_transient( 'fp_ajax_data' );
 
 		$fb_feed = ( ! $cache_data ) ? $fb_feed = $this->sdk->get_feed() : $cache_data;
 
-
-
 		$count = 0;
-
 		foreach ($fb_feed['data'] as $key => $post) {
 
 			$count++; 
 
-			// $type = ( ! isset( $post['attachments']['data'][0]['type'] ) ) ? $post['type'] : $post['attachments']['data'][0]['type'] ;
+			$type = ( ! isset( $post['attachments']['data'][0]['type'] ) ) ? $post['type'] : $post['attachments']['data'][0]['type'] ;
 
-			// if ($type == 'status'){
-			// 	$type = 'post';
-			// }
-			// switch ( $type ) {
-			// 	case 'photo':
-			// 		$this->wp_insert_post( $post, 'post' );
-			// 		break;
+			if ($type == 'status'){
+				$type = 'post';
+			}
+			switch ( $type ) {
+				case 'photo':
+					$this->wp_insert_post( $post, 'post' );
+					break;
 				
-			// 	case 'album':
-			// 		$this->wp_insert_post( $post, 'album' );
-			// 		break;
+				case 'album':
+					$this->wp_insert_post( $post, 'album' );
+					break;
 				
-			// 	case 'event':
-			// 		$this->wp_insert_post( $post, 'event' );
-			// 		break;
+				case 'event':
+					$this->wp_insert_post( $post, 'event' );
+					break;
 				
-			// 	case 'video_inline':
-			// 		$this->wp_insert_post( $post, 'video' );
-			// 		break;
-			// }
+				case 'video_inline':
+					$this->wp_insert_post( $post, 'video' );
+					break;
+			}
 			unset( $fb_feed['data'][$key] );
 
-			if ( $count == $step ){
+			if ( $count == 10 ){
 				if ( empty($fb_feed['data']) ){
 
 					delete_transient('fp_ajax_data');
-
-					return true;
+					// debug($fb_feed);die;
+					return false;
 
 				}else{
 
-					set_transient( 'fp_ajax_data', $fb_feed, 1 * HOUR_IN_SECONDS );
+					set_transient( 'fp_ajax_data', $fb_feed, 300 );
+					// debug($fb_feed);die;
+					return true;
 					
 				}
 				break;
@@ -271,29 +275,39 @@ class Facebookpress_Admin {
 	 * @since 	1.0.0 
 	 */
 	public function wp_insert_post( $feed_data, $feed_type ){
-		// if ( $feed_type != 'album' ) return false;
-
 		$post_type = Facebookpress::get_option('choose_post_type');
+
 		$post_cat = Facebookpress::get_option('choose_category');
+
+		$post_status = ( empty( Facebookpress::get_option('post_status') ) ) ? 'publish' : Facebookpress::get_option('post_status');
+
 		$import_images = Facebookpress::get_option('import_images');
+
 		$wp_post_type = $post_type[ $feed_type ];
 
 		$category = $post_cat[ $feed_type ];
-		
-
-		if( $feed_data['name'] == 'Timeline Photos' 
-			|| strpos( $feed_data['name'] , 'cover photo') !== false 
-			|| strpos( $feed_data['name'] , 'Photos from') !== false 
-			 ){
-			$post_title = wp_trim_words( $feed_data['message'], 6 );
-		}else{
+		if ( !isset( $feed_data['name'] ) ){
+			
 			$post_title = $feed_data['name'];
+			
+		}elseif( isset($feed_data['name']) && ( $feed_data['name'] == 'Timeline Photos' 
+			|| strpos( $feed_data['name'] , 'cover photo') !== false 
+			|| strpos( $feed_data['name'] , 'Photos from') !== false )
+			 ){
+
+			$post_title = wp_trim_words( $feed_data['message'], 6 );
+
+		}else{
+
+			$post_title = $feed_data['name'];
+
 		}
+		$content = ( isset( $feed_data['message'] ) ) ? $feed_data['message'] : "&nbsp;";
 		$post_data = array(
 		  'post_title'    => wp_strip_all_tags( $post_title ),
-		  'post_content'  => $feed_data['message'],
+		  'post_content'  => $content,
 		  'post_type' 	  => $wp_post_type,
-		  'post_status'   => 'pending',
+		  'post_status'   => $post_status,
 		  'post_category' => array( $category )
 		);
 		$id = wp_insert_post( $post_data );

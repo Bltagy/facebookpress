@@ -119,7 +119,7 @@ class Facebookpress_SDK {
 
 		}else{
 
-			$html_url =  '<br><br><p>Please enter App ID and App Secret	 to activate the button.</p><br><a href="" class="button button-primary fb-button disabled" disabled="disabled">Log in with Facebook!</a>';
+			$html_url =  '<br><br><p>Please enter App ID and App Secret	to activate the button.</p><br><a href="" class="button button-primary fb-button disabled" disabled="disabled">Log in with Facebook!</a>';
 
 		}
 		echo $html_url;
@@ -138,10 +138,10 @@ class Facebookpress_SDK {
 		$page_id = Facebookpress::get_option('page_id');
 
 		$this->fb->setDefaultAccessToken($token);
-
+		$wanted_count = ( Facebookpress::get_option('wanted_count') ) ? $post_type = Facebookpress::get_option('wanted_count') : 100;
 		try {
 
-		  $response = $this->fb->get('/'.$page_id.'/feed?fields=attachments,name,type,caption,message&limit=20');
+		  $response = $this->fb->get('/'.$page_id.'/feed?fields=attachments,name,type,caption,message&limit='.$wanted_count);
 		
 		} catch(Facebook\Exceptions\FacebookResponseException $e) {
 		  // When Graph returns an error

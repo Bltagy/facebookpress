@@ -11,7 +11,7 @@
  * @wordpress-plugin
  * Plugin Name:       FacebookPress
  * Plugin URI:        http://bltagy.com/facepress
- * Description:       Allows you to import the feed of a public page or profile on your website as post or custom post type.
+ * Description:       Allows you to import the feed of a public page or a group to your website as a post or a custom post type with specific category with downloading and attaching all the images.
  * Version:           1.0.0
  * Author:            Ahmed Bltagy
  * Author URI:        http://bltagy.com

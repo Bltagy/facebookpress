@@ -61,6 +61,14 @@ jQuery(function($) {
         /* Act on the event */
     });
 
+    $(document).on('click', '#run-importer', function(event) {
+        event.preventDefault();
+        $('.ui-progressbar').css('display', 'block');
+        progress()
+        send_ajax_progress();
+        /* Act on the event */
+    });
+
     /*====================================
     =            Progress bar            =
     ====================================*/
@@ -80,16 +88,33 @@ jQuery(function($) {
 
     function progress() {
         var val = progressbar.progressbar("value") || 0;
-
-        progressbar.progressbar("value", val + 2);
-
-        if (val < 99) {
-            // setTimeout(progress, 200);
-        }
+        if ( val  == 90 && ! $('.ui-progressbar-value').hasClass('hold') ){
+        	$('.ui-progressbar-value').addClass('hold');
+        	return true;	
+        } 
+        progressbar.progressbar("value", val + Number(ajax_object.step));
     }
 
-    setTimeout(progress, 2000);
-
     /*=====  End of Progress bar  ======*/
+
+
+    function send_ajax_progress() {
+        var data = {
+            'action': 'run_importer',
+            'security': ajax_object.secure_ajax // We pass php values differently!
+        };
+        // We can also pass the url value separately from ajaxurl for front end AJAX implementations
+        jQuery.post(ajax_object.ajax_url, data, function(response) {
+                if (response.success) {
+                    send_ajax_progress();
+                    progress()
+                }else{
+                    progress()
+                }
+            }
+
+
+        );
+    }
 
 });

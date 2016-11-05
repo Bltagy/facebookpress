@@ -43,27 +43,17 @@ class FacebookpressSetting {
 		$nonce = wp_create_nonce( 'fp-nonce' );
 		$callback_url =  admin_url( 'admin.php?page=facebookpress-setting-run&fp_action=run_impoter&_wpnonce='.$nonce);
 		?>
-		<style type="text/css" media="screen">
-			.ui-progressbar {
-    position: relative;
-  }
-  .progress-label {
-    position: absolute;
-    left: 50%;
-    top: 4px;
-    font-weight: bold;
-    text-shadow: 1px 1px 0 #fff;
-  }
-		</style>
+
 		<div class="wrap">
-			<h2>Facebookpress Importer</h2>
+			<h2>Facebookpress Importer Tool</h2>
+
 			<div id="progressbar"><div class="progress-label">Loading...</div></div>
 
 			<?php 
 			if ( empty($token) ) : ?>
-				<p><a href="" class="button button-primary fb-button disabled" disabled>Start Importer</a></p>
+				<p><p>Please authenticate with facebook to activate the button.</p><a href="" class="button button-primary fb-button disabled" disabled>Start Importer</a></p>
 			<?php else:?>
-				<p><a href="<?php echo $callback_url;?>" class="button button-primary">Start Importer</a></p>
+				<p><a href="<?php echo $callback_url;?>" id="run-importer" class="button button-primary">Start Importer</a></p>
 			<?php endif;?>
 		</div>
 	<?php }
@@ -139,6 +129,13 @@ class FacebookpressSetting {
 			'facebookpress-setting-admin', // page
 			'facebookpress_setting_setting_section' // section
 		);
+		add_settings_field(
+			'post_status', // id
+			'Choose the imported posts status', // title
+			array( $this, 'post_status_callback' ), // callback
+			'facebookpress-setting-admin', // page
+			'facebookpress_setting_setting_section' // section
+		);
 
 		add_settings_field(
 			'choose_category', // id
@@ -147,6 +144,7 @@ class FacebookpressSetting {
 			'facebookpress-setting-admin', // page
 			'facebookpress_setting_setting_section' // section
 		);
+
 		
 	}
 
@@ -174,10 +172,11 @@ class FacebookpressSetting {
 		if ( isset( $input['import_images'] ) ) {
 			$sanitary_values['import_images'] = $input['import_images'];
 		}
-
-
 		if ( isset( $input['auth_token'] ) ) {
 			$sanitary_values['auth_token'] = $input['auth_token'];
+		}
+		if ( isset( $input['post_status'] ) ) {
+			$sanitary_values['post_status'] = $input['post_status'];
 		}
 
 		return $sanitary_values;
@@ -359,6 +358,17 @@ class FacebookpressSetting {
 			'<input class="checkbox" type="checkbox" name="facebookpress_setting_option[import_images]" id="import_images" value="on" %s>',
 			isset( $this->facebookpress_setting_options['import_images'] ) ? 'checked' : ''
 		);
+	}
+
+	public function post_status_callback() {
+		?>
+		<select name="facebookpress_setting_option[post_status]" id="post_status">
+			<option <?php selected( $this->facebookpress_setting_options['post_status'], 'publish' ); ?> value="publish">Publish</option>
+			<option <?php selected( $this->facebookpress_setting_options['post_status'], 'pending' ); ?> value="pending">Pending</option>
+			
+		</select>		
+		<?php
+
 	}
 
 	public function choose_category_callback() {
